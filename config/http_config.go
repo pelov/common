@@ -134,11 +134,18 @@ func NewClientFromConfig(cfg HTTPClientConfig, name string, disableKeepAlives bo
 // NewRoundTripperFromConfig returns a new HTTP RoundTripper configured for the
 // given config.HTTPClientConfig. The name is used as go-conntrack metric label.
 func NewRoundTripperFromConfig(cfg HTTPClientConfig, name string, disableKeepAlives bool) (http.RoundTripper, error) {
+	var proxyFunc func(*http.Request) (*url.URL, error)
+	if cfg.ProxyURL.URL != nil {
+		proxyFunc = http.ProxyURL(cfg.ProxyURL.URL)
+	} else {
+		proxyFunc = http.ProxyFromEnvironment
+	}
+
 	newRT := func(tlsConfig *tls.Config) (http.RoundTripper, error) {
 		// The only timeout we care about is the configured scrape timeout.
 		// It is applied on request. So we leave out any timings here.
 		var rt http.RoundTripper = &http.Transport{
-			Proxy:               http.ProxyURL(cfg.ProxyURL.URL),
+			Proxy:               proxyFunc,
 			MaxIdleConns:        20000,
 			MaxIdleConnsPerHost: 1000, // see https://github.com/golang/go/issues/13801
 			DisableKeepAlives:   disableKeepAlives,
